@@ -20,7 +20,7 @@ function processRoom(roomId, {intents, roomObjects, users, roomTerrain, gameTime
             hasNewbieWalls = false,
             stats = driver.getRoomStatsUpdater(roomId),
             objectsToHistory = {},
-            roomSpawns = [], roomExtensions = [],
+            roomSpawns = [], roomExtensions = [], invaderCore = null,
             oldRoomInfo = _.clone(roomInfo);
 
         roomInfo.active = false;
@@ -59,6 +59,7 @@ function processRoom(roomId, {intents, roomObjects, users, roomTerrain, gameTime
                 };
             }
             if(object.type == 'invaderCore') {
+                invaderCore = object;
                 object._actionLog = object.actionLog;
                 object.actionLog = {
                     transferEnergy: null,
@@ -131,6 +132,19 @@ function processRoom(roomId, {intents, roomObjects, users, roomTerrain, gameTime
             require('./processor/intents/_calc_spawns')(roomSpawns, roomExtensions, scope);
         }
 
+        if(invaderCore && invaderCore.user) {
+            const i = require('./processor/intents/invader-core/pretick')(invaderCore, scope);
+
+            intents.users[invaderCore.user] = intents.users[invaderCore.user] || {};
+            intents.users[invaderCore.user].objects = intents.users[invaderCore.user].objects || {};
+            _.forEach(i, (ii, objId) => {
+                intents.users[invaderCore.user].objects[objId] = _.assign(
+                    ii,
+                    intents.users[invaderCore.user].objects[objId] || {}
+                );
+            });
+        }
+
         movement.init(roomObjects, roomTerrain);
 
         if (intents) {
@@ -194,6 +208,10 @@ function processRoom(roomId, {intents, roomObjects, users, roomTerrain, gameTime
 
                     if(object.type == 'powerSpawn') {
                         require('./processor/intents/power-spawns/intents')(object, objectIntents, scope);
+                    }
+
+                    if(object.type == 'invaderCore') {
+                        require('./processor/intents/invader-core/intents')(object, objectIntents, scope);
                     }
 
                     if (object.type == 'extension' || object.type == 'storage' || object.type == 'powerSpawn' || object.type == 'terminal' || object.type == 'container') {
